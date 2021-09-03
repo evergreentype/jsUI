@@ -21,31 +21,32 @@ function switchCase(key, cases, defaultCase) {
 
 
 // MARK: Interfaces
-// Interface reference: https://medium.com/@yuribett/javascript-abstract-method-with-es6-5dbea4b00027
-class _ViewType {
-  /** @return {string} HTML of drawn view. */
-  get render() { throw new Error(`Implementation of render() missing at ${this.constructor.name} !`) }
-}
-
 /** Interface for View types.
  * Support HTML Global Attributes.
+ * Interface reference: https://medium.com/@yuribett/javascript-abstract-method-with-es6-5dbea4b00027
  */
-class ViewType extends _ViewType {
-  // Attributes
+class ViewType {
+  // Global attributes
   _class = null
   _id = null
   _style = null
+  _title = null
 
   class(classID) { this._class = classID; return this }
   id(newID) { this._id = newID; return this }
   style(style_definitions) { this._style = style_definitions; return this }
+  title(text) { this._title = text; return this }
 
   inherit_globalAtrs(view) {
     this._class = view._class
     this._id = view._id
     this._style = view._style
+    this._title = view._title
     return this
   }
+
+  /** @return {string} HTML of drawn view. */
+  get render() { throw new Error(`Implementation of render() missing at ${this.constructor.name} !`) }
 }
 
 /** Interface for built-in HTML tag views. */
@@ -80,7 +81,7 @@ function drawRaw(content) {
  * @param {"value"|"boolean"} type
  * @return {string}
 */
-function render_optAtr(label, attribute = null, type = "value") {
+function render_optAtr(label, attribute = null, type = 'value') {
   return attribute != null ?
     switchCase(type, {
       'value': `${label}="${attribute}"`,
@@ -90,19 +91,60 @@ function render_optAtr(label, attribute = null, type = "value") {
 }
 function render_globalAtrs(view) {
   return [
-    render_optAtr("class", view._class),
-    render_optAtr("id", view._id),
-    render_optAtr("style", view._style)
+    render_optAtr('class', view._class),
+    render_optAtr('id', view._id),
+    render_optAtr('style', view._style),
+    render_optAtr('title', view._title)
   ].filter(x => x != '').join(' ')
 }
-/** Renders optional attributes as well as global attributes.
- * @param {[["label","attribute","?type"]]} optionalAttributes
- */
+/** Renders optional attributes as well as global attributes  
+ * @param {[TagAtr]} optionalAttributes */
 function render_commonAtr(view, optionalAttributes = [], includeGlobalAttributes = true) {
   return [
-    optionalAttributes.map(atr => render_optAtr(atr[0], atr[1], atr[2])).filter(x => x != '').join(' '),
+    optionalAttributes.map(atr => render_optAtr(atr.name, atr.val, atr.type)).filter(x => x != '').join(' '),
     (includeGlobalAttributes ? render_globalAtrs(view) : '')
   ].filter(x => x != '').join(' ')
+}
+
+
+// MARK: Generator type
+// Creates HTML tag attribute structure
+class TagAtr {
+  constructor(name, val = null, type = "value") {
+    this.name = name
+    this.val = val
+    this.type = type
+  }
+}
+
+/** Type that generates Views for builtin HTML tags */
+class _ElementView extends BuiltinViewType {
+  elementName
+  /** @type {any} HTML element content */
+  content
+  /** @type {[TagAtr]} Required attributes */
+  atrsRequired
+  /** @type {[TagAtr]} Optional attributes */
+  atrsOpt
+
+  constructor(elementName, content, atrsRequired = [], atrsOpt = []) {
+    super()
+    this.elementName = elementName
+    this.content = content
+    this.atrsRequired = atrsRequired
+    this.atrsOpt = atrsOpt
+
+    this.atrsRequired.concat(this.atrsOpt).map((atr) => {
+      this[atr.name] = {
+        'value': (val) => { this[`_${atr.name}`] = val; return this },
+        'boolean': (val = true) => { this[`_${atr.name}`] = val; return this }
+      }[atr.type]
+    })
+  }
+
+  get raw() {
+    return `<${this.elementName} ${render_commonAtr(this, this.atrsRequired.concat(this.atrsOpt).map(atr => { atr.val = this[`_${atr.name}`]; return atr }))}>${drawRaw(this.content)}</${this.elementName}>`
+  }
 }
 
 
@@ -120,317 +162,240 @@ class _forEachView extends ViewType {
   }
 
   get render() {
-    return this.elements.map(this.f_elToView).map(drawRaw).join('')
+    return this.elements.map(el => this.f_elToView(el)).map(drawRaw).join('')
   }
 }
 let forEachView = (data, f_view) => new _forEachView(data, f_view)
 
 
-// MARK: <div> view
-class _divView extends BuiltinViewType {
-  elements
-
-  constructor(elements) {
-    super()
-    this.elements = elements
-  }
-
-  get raw() {
-    return `
-        <div ${render_commonAtr(this)}>
-          ${this.elements.map(drawRaw).join('')}
-        </div>
-      `
-  }
-}
-let div = (...elements) => new _divView(elements)
+// MARK: HTML Elements by Category
+// Reference: https://www.w3schools.com/TAGS/ref_byfunc.asp
 
 
-// MARK: <main>, <nav>, <header> view
-class _mainView extends BuiltinViewType {
-  /** @type {ViewType|any} */
-  content
+// MARK: Basic HTML, 12 total
+// REVIEW: Missing Basic HTML tags
+// <head>   Contains metadata/information for the document
+// <title>  Defines a title for the document
+// <body>   Defines the document's body
 
-  constructor(content) {
-    super()
-    this.content = content
-  }
+/** Defines HTML headings */
+let h1 = (...content) => new _ElementView('h1', content),
+  h2 = (...content) => new _ElementView('h2', content),
+  h3 = (...content) => new _ElementView('h3', content),
+  h4 = (...content) => new _ElementView('h4', content),
+  h5 = (...content) => new _ElementView('h5', content),
+  h6 = (...content) => new _ElementView('h6', content)
 
-  get raw() {
-    return `
-      <main ${render_commonAtr(this)}>
-        ${this.content.map(drawRaw).join('')}
-      </main>
-    `
-  }
-}
-let main = (...content) => new _mainView(content)
-
-class _navView extends BuiltinViewType {
-  elementViews
-  // optional attributes
-  _for
-  constructor(elementViews) {
-    super()
-    this.elementViews = elementViews
-  }
-  for(id) { this._for = id; return this }
-  get render() {
-    return `
-      <nav ${render_commonAtr(this, [["for", this._for]])}>
-        ${this.elementViews.map(drawRaw).join('')}
-      </nav>
-    `
-  }
-}
-let nav = (...elementViews) => new _navView(elementViews)
-
-class _headerView extends BuiltinViewType {
-  elementViews
-
-  constructor(elementViews) {
-    super()
-    this.elementViews = elementViews
-  }
-
-  get render() {
-    return `
-      <header ${render_commonAtr(this)}>
-        ${this.elementViews.map(drawRaw).join('')}
-      </header>
-    `
-  }
-}
-let header = (...elementViews) => new _headerView(elementViews)
+/** Defines a paragraph */
+let p = (...content) => new _ElementView('p', content)
+/** Inserts a single line break */
+let br = () => new _ElementView('br', null)
+/** Defines a thematic change in the content */
+let hr = () => new _ElementView('hr', null)
 
 
-// MARK: <p>, <b>, <h1-6> view
-/** Renders text-based views */
-class _TextView extends BuiltinViewType {
-  tagName
-  text
+// MARK: Formatting, 33 total
+// REVIEW: Missing Formatting tags
+// <kbd>      Defines keyboard input
+// <rp>       Defines what to show in browsers that do not support ruby annotations
+// <rt>       Defines an explanation/pronunciation of characters (for East Asian typography)
+// <ruby>     Defines a ruby annotation (for East Asian typography)
+// <small>    Defines smaller text
+// <template> Defines a container for content that should be hidden when the page loads
+// <var>      Defines a variable
+// <wbr>      Defines a possible line-break
 
-  constructor(tagName, ...text) {
-    super()
-    this.tagName = tagName
-    this.text = text
-  }
-
-  get raw() {
-    return `<${this.tagName} ${render_commonAtr(this)}> ${this.text.map(drawRaw).join('')} </${this.tagName}>`
-  }
-}
-let p = (...text) => new _TextView('p', text),
-  b = (...text) => new _TextView('b', text),
-  i = (...text) => new _TextView('i', text),
-  h1 = (...text) => new _TextView('h1', text),
-  h2 = (...text) => new _TextView('h2', text),
-  h3 = (...text) => new _TextView('h3', text),
-  h4 = (...text) => new _TextView('h4', text),
-  h5 = (...text) => new _TextView('h5', text),
-  h6 = (...text) => new _TextView('h6', text)
-
-
-// MARK: <a> view
-class _aView extends BuiltinViewType {
-  text
-  // Attributes
-  _href
-
-  constructor(text) {
-    super()
-    this.text = text
-  }
-
-  href(url) { this._href = url; return this }
-
-  get raw() {
-    return `
-      <a href="${this._href}" ${render_commonAtr(this)}>
-        ${drawRaw(this.text)}
-      </a>`
-  }
-}
-let a = (...text) => new _aView(text)
-
-
-// MARK: <img> view
-/** HTML img tag.
- * Reference: https://www.w3schools.com/html/html_images.asp */
-class _imgView extends BuiltinViewType {
-  _src
-  _alt
-  /** @type {"eager"|"lazy"} */
-  _loading = null
-
-  src(url) { this._src = url; return this }
-  alt(text) { this._alt = text; return this }
-
-  loading(type) { this._loading = type; return this }
-
-  get raw() {
-    return `<img src="${this._src}" alt="${this._alt}" ${render_commonAtr(this, [["loading", this._loading]])}>`
-  }
-}
-let img = () => new _imgView()
-
-// MARK: <video> view
-class _sourceView extends BuiltinViewType {
-  /** @type {string} URL */
-  _src
-  /** @type {string} */
-  _type
-
-  constructor(src, type) {
-    super()
-    this._src = src
-    this._type = type
-  }
-
-  get raw() {
-    return `<source src="${this._src}" type="${this._type}" ${render_commonAtr(this)}>`
-  }
-}
-let source = (src, type) => new _sourceView(src, type)
-
-/** Reference: https://www.w3schools.com/tags/tag_video.asp */
-class _videoView extends BuiltinViewType {
-  /** @type {[(_sourceView|string)]} Could be \<source> tag or text */
-  sources
-  // Optional attributes
-  /** @type {boolean} */
-  _controls = null
-  /** @type {string} URL */
-  _poster = null
-  /** @type {("auto"|"metadata"|"none")} */
-  _preload = null
-
-  constructor(sources) {
-    super()
-    this.sources = sources
-  }
-
-  get controls() { this._controls = true; return this }
-  poster(url) { this._poster = url; return this }
-  preload(val) { this._preload = val; return this }
-
-  get raw() {
-    return `
-        <video ${render_commonAtr(this, [
-      ["controls", this._controls, "boolean"],
-      ["poster", this._poster],
-      ["preload", this._preload]
-    ])}>
-          ${// Sources
-      forEachView(this.sources, drawRaw).render
-      }
-        </video>
-      `
-  }
-}
-let video = (...sources) => new _videoView(sources)
+/** Defines an abbreviation or an acronym */
+let abbr = (...content) => new _ElementView('abbr', content)
+/** Defines contact information for the author/owner of a document/article */
+let address = (...content) => new _ElementView('address', content)
+/** Defines bold text */
+let b = (...content) => new _ElementView('b', content)
+/** Isolates a part of text that might be formatted in a different direction from other text outside it */
+let bdi = (...content) => new _ElementView('bdi', content)
+/** Overrides the current text direction */
+let bdo = (...content) => new _ElementView('bdo', content, [new TagAtr('dir')])
+/** Defines a section that is quoted from another source */
+let blockquote = (...content) => new _ElementView('blockquote', content, [], [new TagAtr('cite')])
+/** Defines the title of a work */
+let cite = (...content) => new _ElementView('cite', content)
+/** Defines a piece of computer code */
+let code = (...content) => new _ElementView('code', content)
+/** Defines text that has been deleted from a document */
+let del = (...content) => new _ElementView('del', content, [], [new TagAtr('cite'), new TagAtr('datetime')])
+/** Specifies a term that is going to be defined within the content */
+let dfn = (...content) => new _ElementView('dfn', content)
+/** Defines emphasized text */
+let em = (...content) => new _ElementView('em', content)
+/** Defines a part of text in an alternate voice or mood */
+let i = (...content) => new _ElementView('i', content)
+/** Defines a text that has been inserted into a document */
+let ins = (...content) => new _ElementView('ins', content, [], [new TagAtr('cite'), new TagAtr('datetime')])
+/** Defines marked/highlighted text */
+let mark = (...content) => new _ElementView('mark', content)
+/** Defines a scalar measurement within a known range (a gauge) */
+let meter = (...content) => new _ElementView('meter', content, [new TagAtr('value')], [new TagAtr('form'), new TagAtr('high'), new TagAtr('low'), new TagAtr('max'), new TagAtr('min'), new TagAtr('optimum')])
+/** Defines preformatted text */
+let pre = (...content) => new _ElementView('pre', content)
+/** Represents the progress of a task */
+let progress = (...content) => new _ElementView('progress', content, [new TagAtr('max'), new TagAtr('value')])
+/** Defines a short quotation */
+let q = (...content) => new _ElementView('q', content, [new TagAtr('cite')])
+/** Defines text that is no longer correct */
+let s = (...content) => new _ElementView('s', content)
+/** Defines sample output from a computer program */
+let samp = (...content) => new _ElementView('samp', content)
+/** Defines important text */
+let strong = (...content) => new _ElementView('strong', content)
+/** Defines subscripted text */
+let sub = (...content) => new _ElementView('sub', content)
+/** Defines superscripted text */
+let sup = (...content) => new _ElementView('sup', content)
+/** Defines a specific time (or datetime) */
+let time = (...content) => new _ElementView('time', content, [new TagAtr('datetime')])
+/** Defines some text that is unarticulated and styled differently from normal text */
+let u = (...content) => new _ElementView('u', content)
 
 
-// MARK: <button> view
-/** Reference: https://www.w3schools.com/tags/tag_button.asp */
-class _buttonView extends BuiltinViewType {
-  body
-  /** @type{"button"|"reset"|"submit"} */
-  _type
-  _onclick
+// MARK: Forms and Input, 12 total
+// REVIEW: Missing Forms and Input tags
+// TODO: <form>       Defines an HTML form for user input
+// TODO: <input>      Defines an input control
+// TODO: <textarea>   Defines a multiline input control (text area)
+// TODO: <select>     Defines a drop-down list
+// TODO: <optgroup>   Defines a group of related options in a drop-down list
+// TODO: <option>     Defines an option in a drop-down list
+// TODO: <label>      Defines a label for an <input> element
+// TODO: <fieldset>   Groups related elements in a form
+// TODO: <legend>     Defines a caption for a <fieldset> element
+// TODO: <datalist>   Specifies a list of pre-defined options for input controls
+// TODO: <outpu>      Defines the result of a calculation
 
-  constructor(body) {
-    super()
-    this.body = body
-  }
-
-  type(val) { this._type = val; return this }
-  onclick(action) { this._onclick = action; return this }
-
-  get raw() {
-    return `
-      <button ${render_commonAtr(this, [
-      ["type", this._type],
-      ["onclick", this._onclick]
-    ])}>
-        ${this.body.map(drawRaw).join('')}
-      </button>
-    `
-  }
-}
-let button = (...body) => new _buttonView(body)
+/** Defines a clickable button */
+let button = (...content) => new _ElementView('button', content,
+  [new TagAtr('type')],
+  [new TagAtr('autofocus', null, 'boolean'), new TagAtr('disabled', null, 'boolean'), new TagAtr('form'), new TagAtr('formaction'), new TagAtr('formenctype'), new TagAtr('formmethod'), new TagAtr('formnovalidate', null, 'boolean'), new TagAtr('formtarget'), new TagAtr('name'), new TagAtr('value')]
+)
 
 
-// MARK: <table> view
-/** Table header */
-class _thView extends BuiltinViewType {
-  /** @type {ViewType|any} */
-  colName
+// MARK: Images, 8 total
+// Missing Images tags
+// <map>  Defines a client-side image map
+// <area> Defines an area inside an image map
 
-  constructor(colName) {
-    super()
-    this.colName = colName
-  }
+/** Defines an image */
+let img = () => new _ElementView('img',
+  [new TagAtr('src'), new TagAtr('alt')],
+  [new TagAtr('crossorigin'), new TagAtr('ismap', null, 'boolean'), new TagAtr('loading'), new TagAtr('longdesc'), new TagAtr('referrerpolicy'), new TagAtr('usemap')]
+)
+/** Used to draw graphics, on the fly, via scripting */
+let canvas = (...content) => new _ElementView('canvas', content)
+/** Specifies self-contained content */
+let figure = (...content) => new _ElementView('figure', content)
+/** Defines a caption for a figure element */
+let figcaption = (...content) => new _ElementView('figcaption', content)
+/** Defines a container for multiple image resources */
+let picture = (...content) => new _ElementView('picture', content)
+/** Defines a container for SVG graphics */
+let svg = (...content) => new _ElementView('svg', content)
 
-  get raw() {
-    return `<th ${render_commonAtr(this)}> ${drawRaw(this.colName)} </th>`
-  }
-}
-let th = colName => new _thView(colName)
 
-/** Table cell */
-class _tdView extends BuiltinViewType {
-  /** @type {ViewType|any} */
-  data
+// MARK: Audio / Video, 4 total
+// Missing Audio / Video tags
+// <track>  Defines text tracks for media elements (<video> and <audio>)
 
-  constructor(data) {
-    super()
-    this.data = data
-  }
+/** Defines sound content */
+let audio = (...content) => new _ElementView('audio', content, [],
+  [new TagAtr('autoplay', null, 'boolean'), new TagAtr('controls', null, 'boolean'), new TagAtr('loop', null, 'boolean'), new TagAtr('muted', null, 'boolean'), new TagAtr('preload')]
+)
+/** Defines multiple media resources for media elements (video, audio and picture) */
+let source = () => new _ElementView('source', [],
+  [new TagAtr('media'), new TagAtr('src'), new TagAtr('srcset'), new TagAtr('type')]
+)
+/** Defines a video or movie */
+let video = (...content) => new _ElementView('video', content, [],
+  [new TagAtr('autoplay', null, 'boolean'), new TagAtr('controls', null, 'boolean'), new TagAtr('loop', null, 'boolean'), new TagAtr('muted', null, 'boolean'), new TagAtr('poster'), new TagAtr('preload')]
+)
 
-  get raw() {
-    return `<td ${render_commonAtr(this)}> ${drawRaw(this.data)} </td>`
-  }
-}
-let td = data => new _tdView(data)
 
-/** Table row */
-class _trView extends BuiltinViewType {
-  /** @type {[ViewType]|[any]} */
-  cols
+// MARK: Links, 3 total
+// Missing Links tags
+// <link>   Defines the relationship between a document and an external resource (most used to link to style sheets)
 
-  constructor(cols) {
-    super()
-    this.cols = cols
-  }
+/** Defines a hyperlink */
+let a = (...content) => new _ElementView('a', content,
+  [new TagAtr('href')],
+  [new TagAtr('download', null, 'boolean'), new TagAtr('hreflang'), new TagAtr('media'), new TagAtr('referrerpolicy'), new TagAtr('rel'), new TagAtr('target'), new TagAtr('type')]
+)
+/** Defines navigation links */
+let nav = (...content) => new _ElementView('nav', content)
 
-  get raw() {
-    return `
-        <tr ${render_commonAtr(this)}>
-          ${// Columns
-      forEachView(this.cols, drawRaw).render} 
-        </tr>
-       `
-  }
-}
-let tr = (...cols) => new _trView(cols)
 
-/** HTML table view. */
-class _tableView extends BuiltinViewType {
-  /** @type {[_trView]} Function that creates an array of table rows. */
-  content
+// MARK: Lists, 6 total
+// REVIEW: Missing List tags
+// <dl>     Defines a description list
+// <dt>     Defines a term/name in a description list
+// <dd>     Defines a description of a term/name in a description list
 
-  constructor(...content) {
-    super()
-    this.content = content
-  }
+/** Defines an unordered list */
+let ul = (...content) => new _ElementView('ul', content)
+/** Defines an unordered list */
+let ol = (...content) => new _ElementView('ol', content, [], [new TagAtr('reversed', null, 'boolean'), new TagAtr('start'), new TagAtr('type')])
+/** Defines a list item */
+let li = (...content) => new _ElementView('li', content)
 
-  get raw() {
-    return `
-        <table ${render_commonAtr(this)}>
-            ${forEachView(this.content, drawRaw).render}
-        </table>
-    `
-  }
-}
-let table = (...content) => new _tableView(content)
+
+// MARK: Tables, 10 total
+// REVIEW: Missinge Tables tags
+// <col>        Specifies column properties for each column within a <colgroup> element
+// <colgroup>   Specifies a group of one or more columns in a table for formatting
+
+/** Defines a table */
+let table = (...content) => new _ElementView('table', content)
+/** Defines a table caption */
+let caption = (...content) => new _ElementView('caption', content)
+/** Defines a header cell in a table */
+let th = (...content) => new _ElementView('th', content, [],
+  [new TagAtr('abbr'), new TagAtr('colspan'), new TagAtr('headers'), new TagAtr('rowspan'), new TagAtr('scope')]
+)
+/** Defines a row in a table */
+let tr = (...columns) => new _ElementView('tr', columns)
+/** Defines a cell in a table */
+let td = (...content) => new _ElementView('td', content, [],
+  [new TagAtr('colspan'), new TagAtr('headers'), new TagAtr('rowspan')]
+)
+/** Groups the header content in a table */
+let thead = (...content) => new _ElementView('thead', content)
+/** Groups the body content in a table */
+let tbody = (...trs) => new _ElementView('tbody', trs)
+/** Groups the footer content in a table */
+let tfoot = (...trs) => new _ElementView('tfoot', trs)
+
+
+// MARK: Style and Semantics, 13 total
+// REVIEW: Missing Style and Semantics tags
+// <dialog> Defines a dialog box or window
+// <data>   Adds a machine-readable translation of a given content 
+
+/** Defines a section in a document */
+let div = (...content) => new _ElementView('div', content)
+/** Defines a section in a document */
+let span = (...content) => new _ElementView('span', content)
+/** Defines a header for a document or section */
+let header = (...content) => new _ElementView('header', content)
+/** Defines a footer for a document or section */
+let footer = (...content) => new _ElementView('footer', content)
+/** Specifies the main content of a document */
+let main = (...content) => new _ElementView('main', content)
+/** Defines a section in a document */
+let section = (...content) => new _ElementView('section', content)
+/** Defines an article */
+let article = (...content) => new _ElementView('article', content)
+/** Defines content aside from the page content */
+let aside = (...content) => new _ElementView('aside', content)
+/** Defines additional details that the user can view or hide */
+let details = (...content) => new _ElementView('details', content, [], [new TagAtr('open', null, 'boolean')])
+/** Defines additional details that the user can view or hide */
+let summary = (...content) => new _ElementView('summary', content)
+/** Defines additional details that the user can view or hide */
+let data = (...content) => new _ElementView('data', content)
