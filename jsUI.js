@@ -22,7 +22,6 @@ function switchCase(key, cases, defaultCase) {
 
 // MARK: Interfaces
 // Interface reference: https://medium.com/@yuribett/javascript-abstract-method-with-es6-5dbea4b00027
-/** Internal View type that isn't proper HTML. Used by Builder types (e.g. _imgBuilder). */
 class _ViewType {
   /** @return {string} HTML of drawn view. */
   get render() { throw new Error(`Implementation of render() missing at ${this.constructor.name} !`) }
@@ -81,12 +80,14 @@ function drawRaw(content) {
  * @param {"value"|"boolean"} type
  * @return {string}
 */
-let render_optAtr = (label, attribute = null, type = "value") => attribute != null ?
-  switchCase(type, {
-    'value': `${label}="${attribute}"`,
-    'boolean': label
-  }, '') :
-  ''
+function render_optAtr(label, attribute = null, type = "value") {
+  return attribute != null ?
+    switchCase(type, {
+      'value': `${label}="${attribute}"`,
+      'boolean': label
+    }, '') :
+    ''
+}
 function render_globalAtrs(view) {
   return [
     render_optAtr("class", view._class),
@@ -145,7 +146,7 @@ class _divView extends BuiltinViewType {
 let div = (...elements) => new _divView(elements)
 
 
-// MARK: <main> view
+// MARK: <main>, <nav>, <header> view
 class _mainView extends BuiltinViewType {
   /** @type {ViewType|any} */
   content
@@ -165,6 +166,43 @@ class _mainView extends BuiltinViewType {
 }
 let main = (...content) => new _mainView(content)
 
+class _navView extends BuiltinViewType {
+  elementViews
+  // optional attributes
+  _for
+  constructor(elementViews) {
+    super()
+    this.elementViews = elementViews
+  }
+  for(id) { this._for = id; return this }
+  get render() {
+    return `
+      <nav ${render_commonAtr(this, [["for", this._for]])}>
+        ${this.elementViews.map(drawRaw).join('')}
+      </nav>
+    `
+  }
+}
+let nav = (...elementViews) => new _navView(elementViews)
+
+class _headerView extends BuiltinViewType {
+  elementViews
+
+  constructor(elementViews) {
+    super()
+    this.elementViews = elementViews
+  }
+
+  get render() {
+    return `
+      <header ${render_commonAtr(this)}>
+        ${this.elementViews.map(drawRaw).join('')}
+      </header>
+    `
+  }
+}
+let header = (...elementViews) => new _headerView(elementViews)
+
 
 // MARK: <p>, <b>, <h1-6> view
 /** Renders text-based views */
@@ -182,34 +220,15 @@ class _TextView extends BuiltinViewType {
     return `<${this.tagName} ${render_commonAtr(this)}> ${this.text.map(drawRaw).join('')} </${this.tagName}>`
   }
 }
-let p = (...text) => new _TextView('p', text)
-let b = (...text) => new _TextView('b', text)
-let h1 = (...text) => new _TextView('h1', text)
-let h2 = (...text) => new _TextView('h2', text)
-let h3 = (...text) => new _TextView('h3', text)
-let h4 = (...text) => new _TextView('h4', text)
-let h5 = (...text) => new _TextView('h5', text)
-let h6 = (...text) => new _TextView('h6', text)
-
-
-// MARK: <button> view
-class _buttonView extends BuiltinViewType {
-  content
-  // Attributes
-  _onclick
-
-  constructor(content) {
-    super()
-    this.content = content
-  }
-
-  onclick(f) { this._onclick = f; return this }
-
-  get raw() {
-    return `<button ${render_commonAtr(this, [["onclick", this._onclick]])}> ${drawRaw(this.content)} </button>`
-  }
-}
-let button = (content) => new _buttonView(content)
+let p = (...text) => new _TextView('p', text),
+  b = (...text) => new _TextView('b', text),
+  i = (...text) => new _TextView('i', text),
+  h1 = (...text) => new _TextView('h1', text),
+  h2 = (...text) => new _TextView('h2', text),
+  h3 = (...text) => new _TextView('h3', text),
+  h4 = (...text) => new _TextView('h4', text),
+  h5 = (...text) => new _TextView('h5', text),
+  h6 = (...text) => new _TextView('h6', text)
 
 
 // MARK: <a> view
@@ -218,17 +237,21 @@ class _aView extends BuiltinViewType {
   // Attributes
   _href
 
-  constructor(href, text) {
+  constructor(text) {
     super()
-    this._href = href
     this.text = text
   }
 
+  href(url) { this._href = url; return this }
+
   get raw() {
-    return `<a href="${this._href}" ${render_commonAtr(this)}> ${drawRaw(this.text)} </a>`
+    return `
+      <a href="${this._href}" ${render_commonAtr(this)}>
+        ${drawRaw(this.text)}
+      </a>`
   }
 }
-let a = (href, text) => new _aView(href, text)
+let a = (...text) => new _aView(text)
 
 
 // MARK: <img> view
@@ -240,11 +263,8 @@ class _imgView extends BuiltinViewType {
   /** @type {"eager"|"lazy"} */
   _loading = null
 
-  constructor(src, text) {
-    super()
-    this._src = src
-    this._alt = text
-  }
+  src(url) { this._src = url; return this }
+  alt(text) { this._alt = text; return this }
 
   loading(type) { this._loading = type; return this }
 
@@ -252,24 +272,7 @@ class _imgView extends BuiltinViewType {
     return `<img src="${this._src}" alt="${this._alt}" ${render_commonAtr(this, [["loading", this._loading]])}>`
   }
 }
-
-/** img tag builder */
-class _imgBuilder extends _ViewType {
-  _src = null
-  _alt = null
-
-  src(url) { this._src = url; return Object.values(this).includes(null) ? this : img(this._src, this._alt) }
-  alt(text) { this._alt = text; return Object.values(this).includes(null) ? this : img(this._src, this._alt) }
-}
-/** img constructor
- * @return {_imgView|_imgBuilder}
-*/
-function img(src, alt) {
-  return switchCase(arguments.length, {
-    2: new _imgView(src, alt)
-  }, new _imgBuilder())
-}
-
+let img = () => new _imgView()
 
 // MARK: <video> view
 class _sourceView extends BuiltinViewType {
@@ -328,6 +331,36 @@ class _videoView extends BuiltinViewType {
 let video = (...sources) => new _videoView(sources)
 
 
+// MARK: <button> view
+/** Reference: https://www.w3schools.com/tags/tag_button.asp */
+class _buttonView extends BuiltinViewType {
+  body
+  /** @type{"button"|"reset"|"submit"} */
+  _type
+  _onclick
+
+  constructor(body) {
+    super()
+    this.body = body
+  }
+
+  type(val) { this._type = val; return this }
+  onclick(action) { this._onclick = action; return this }
+
+  get raw() {
+    return `
+      <button ${render_commonAtr(this, [
+      ["type", this._type],
+      ["onclick", this._onclick]
+    ])}>
+        ${this.body.map(drawRaw).join('')}
+      </button>
+    `
+  }
+}
+let button = (...body) => new _buttonView(body)
+
+
 // MARK: <table> view
 /** Table header */
 class _thView extends BuiltinViewType {
@@ -380,9 +413,7 @@ class _trView extends BuiltinViewType {
        `
   }
 }
-function tr(...cols) {
-  return new _trView(cols)
-}
+let tr = (...cols) => new _trView(cols)
 
 /** HTML table view. */
 class _tableView extends BuiltinViewType {
@@ -402,6 +433,4 @@ class _tableView extends BuiltinViewType {
     `
   }
 }
-function table(...content) {
-  return new _tableView(content)
-}
+let table = (...content) => new _tableView(content)
