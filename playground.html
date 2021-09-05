@@ -88,6 +88,24 @@
     style(style_definitions) { this._style = style_definitions; return this }
     title(text) { this._title = text; return this }
 
+    // Global modifiers
+    /**
+     * Applies a view modifier conditionally. Used when HTML attribute needs to be applied conditionally.
+     * 
+     * Given itself as an argument, apply some modifiers and return the modified view.
+     * @param {boolean} condition 
+     * @param {(this: ViewType) => ViewType} tru Applies modifications when true
+     * @param {(this: ViewType) => ViewType} els Applies modifications when false
+     * @returns {ViewType} Should return itself after it was modified by some modifiers
+     */
+    modify(condition, tru, fls) {
+      if (tru === undefined)
+        throw new Error('Specify Modifier when true')
+      if (fls === undefined)
+        throw new Error('Specify Modifier when false')
+      return condition ? tru(this) : fls(this)
+    }
+
     /** @return {ViewType|BuiltinViewType|string} Something that is rendered to HTML. */
     get body() { new Error(`Implementation of body() missing at ${this.constructor.name} !`) }
   }
@@ -326,7 +344,7 @@
   // TODO: <fieldset>   Groups related elements in a form
   // TODO: <legend>     Defines a caption for a <fieldset> element
   // TODO: <datalist>   Specifies a list of pre-defined options for input controls
-  // TODO: <outpu>      Defines the result of a calculation
+  // TODO: <output>     Defines the result of a calculation
 
   /** Defines an HTML form for user input */
   let form = (...content) => new ElementView('form', content,
@@ -346,7 +364,7 @@
 
 
   // MARK: Images, 8 total
-  // Missing Images tags
+  // REVIEW: Missing Images tags
   // <map>  Defines a client-side image map
   // <area> Defines an area inside an image map
 
@@ -368,7 +386,7 @@
 
 
   // MARK: Audio / Video, 4 total
-  // Missing Audio / Video tags
+  // REVIEW: Missing Audio / Video tags
   // <track>  Defines text tracks for media elements (<video> and <audio>)
 
   /** Defines sound content */
@@ -386,7 +404,7 @@
 
 
   // MARK: Links, 3 total
-  // Missing Links tags
+  // REVIEW: Missing Links tags
   // <link>   Defines the relationship between a document and an external resource (most used to link to style sheets)
 
   /** Defines a hyperlink */

@@ -1,5 +1,5 @@
 // NOTE: SwiftUI inspired collection of types for declarative HTML rendering in JavaScript.
-// Version: 0.0.1
+// Version: 0.1.0
 
 
 // MARK: Base 
@@ -37,6 +37,24 @@ class ViewType {
   id(newID) { this._id = newID; return this }
   style(style_definitions) { this._style = style_definitions; return this }
   title(text) { this._title = text; return this }
+
+  // Global modifiers
+  /**
+   * Applies a view modifier conditionally. Used when HTML attribute needs to be applied conditionally.
+   * 
+   * Given itself as an argument, apply some modifiers and return the modified view.
+   * @param {boolean} condition 
+   * @param {(this: ViewType) => ViewType} tru Applies modifications when true
+   * @param {(this: ViewType) => ViewType} els Applies modifications when false
+   * @returns {ViewType} Should return itself after it was modified by some modifiers
+   */
+  modify(condition, tru, fls) {
+    if (tru === undefined)
+      throw new Error('Specify Modifier when true')
+    if (fls === undefined)
+      throw new Error('Specify Modifier when false')
+    return condition ? tru(this) : fls(this)
+  }
 
   /** @return {ViewType|BuiltinViewType|string} Something that is rendered to HTML. */
   get body() { new Error(`Implementation of body() missing at ${this.constructor.name} !`) }
