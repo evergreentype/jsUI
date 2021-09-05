@@ -14,5 +14,5 @@ A SwiftUI-inspired HTML templating library for JavaScript
 
 #### Table of contents
 
-[67%] HTML tags implemented
+[69%] HTML tags implemented: 70/101
 

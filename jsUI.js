@@ -276,7 +276,7 @@ let u = (...content) => new ElementView('u', content)
 // TODO: <fieldset>   Groups related elements in a form
 // TODO: <legend>     Defines a caption for a <fieldset> element
 // TODO: <datalist>   Specifies a list of pre-defined options for input controls
-// TODO: <outpu>      Defines the result of a calculation
+// TODO: <output>     Defines the result of a calculation
 
 /** Defines an HTML form for user input */
 let form = (...content) => new ElementView('form', content,
@@ -296,7 +296,7 @@ let button = (...content) => new ElementView('button', content,
 
 
 // MARK: Images, 8 total
-// Missing Images tags
+// REVIEW: Missing Images tags
 // <map>  Defines a client-side image map
 // <area> Defines an area inside an image map
 
@@ -318,7 +318,7 @@ let svg = (...content) => new ElementView('svg', content)
 
 
 // MARK: Audio / Video, 4 total
-// Missing Audio / Video tags
+// REVIEW: Missing Audio / Video tags
 // <track>  Defines text tracks for media elements (<video> and <audio>)
 
 /** Defines sound content */
@@ -336,7 +336,7 @@ let video = (...content) => new ElementView('video', content, [],
 
 
 // MARK: Links, 3 total
-// Missing Links tags
+// REVIEW: Missing Links tags
 // <link>   Defines the relationship between a document and an external resource (most used to link to style sheets)
 
 /** Defines a hyperlink */
