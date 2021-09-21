@@ -1,5 +1,5 @@
 // NOTE: SwiftUI inspired collection of types for declarative HTML rendering in JavaScript.
-// Version: 0.1.0
+// Version: 0.2.0
 
 
 // MARK: Base 
@@ -54,6 +54,25 @@ class ViewType {
     if (fls === undefined)
       throw new Error('Specify Modifier when false')
     return condition ? tru(this) : fls(this)
+  }
+
+  /**
+   * Allows a parent view (mainly, customly created ones) to pass global attributes to its childen views.
+   * @exmaple 
+   * // ... Set attributes to custom view
+   * MyView().class('myClass')
+   * // ... Specify view to inherit parent's attribute
+   * get body() { return table(...).inherit_attributes(this) }
+   * // Now that will copy parent's CLASS, ID, STYLE, TITLE attributes into its HTML tag.
+   * @param {ViewType} view Parent view.
+   * @returns {ViewType} Child view that copied parent view's global attributes.
+   */
+  inherit_attributes(view) {
+    return this
+      .modify(view._class != null, (v) => v.class(view._class), (v) => v)
+      .modify(view._id != null, (v) => v.id(view._id), (v) => v)
+      .modify(view._style != null, (v) => v.style(view._style), (v) => v)
+      .modify(view._title != null, (v) => v.title(view._title), (v) => v)
   }
 
   /** @return {ViewType|BuiltinViewType|string} Something that is rendered to HTML. */
